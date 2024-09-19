@@ -1,0 +1,6 @@
+Flask==2.3.2
+vcfpy==0.13.0
+cyvcf2==0.30.16
+requests==2.31.0
+snakemake==7.25.0
+gnomad==0.6.4

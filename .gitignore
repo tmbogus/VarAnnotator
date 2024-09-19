@@ -1,0 +1,19 @@
+# Ignore the Python virtual environment folder
+venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+*.egg-info/
+.eggs/
+
+# Other common excludes
+.idea/
+.vscode/
