@@ -3,7 +3,11 @@
 import sys
 import csv
 import pandas as pd
-import vcf  # PyVCF to parse VCF files
+from cyvcf2 import VCF
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Placeholder functions for annotations
 def annotate_gene(variant):
@@ -19,8 +23,14 @@ def annotate_population_frequency(variant):
     return 0.05
 
 def process_vcf(vcf_file, output_file):
-    # Read VCF file
-    vcf_reader = vcf.Reader(open(vcf_file, 'r'))
+    logging.info("Processing VCF file: %s", vcf_file)
+
+    # Read VCF file using cyvcf2
+    try:
+        vcf_reader = VCF(vcf_file)
+    except Exception as e:
+        logging.error("Failed to read VCF file: %s", e)
+        sys.exit(1)
 
     # Prepare output file
     with open(output_file, 'w', newline='') as csvfile:
@@ -31,32 +41,35 @@ def process_vcf(vcf_file, output_file):
 
         # Process each variant in the VCF
         for record in vcf_reader:
-            gene = annotate_gene(record)
-            dbsnp = annotate_dbsnp(record)
-            frequency = annotate_population_frequency(record)
-            depth = record.INFO.get('DP', 'NA')
+            try:
+                gene = annotate_gene(record)
+                dbsnp = annotate_dbsnp(record)
+                frequency = annotate_population_frequency(record)
+                depth = record.format('DP')[0] if 'DP' in record.FORMAT else 'NA'
 
-            # Write annotated variant to file
-            writer.writerow({
-                'CHROM': record.CHROM,
-                'POS': record.POS,
-                'ID': record.ID,
-                'REF': record.REF,
-                'ALT': ','.join(str(a) for a in record.ALT),
-                'Gene': gene,
-                'dbSNP': dbsnp,
-                'Frequency': frequency,
-                'DP': depth
-            })
-
+                # Write annotated variant to file
+                writer.writerow({
+                    'CHROM': record.CHROM,
+                    'POS': record.POS,
+                    'ID': record.ID,
+                    'REF': record.REF,
+                    'ALT': ','.join(record.ALT),
+                    'Gene': gene,
+                    'dbSNP': dbsnp,
+                    'Frequency': frequency,
+                    'DP': depth
+                })
+                logging.info("Annotated variant: %s", record.ID)
+            except Exception as e:
+                logging.error("Error processing variant %s: %s", record.ID, e)
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python annotate_variants.py <input_vcf> <output_tsv>")
+        logging.error("Usage: python annotate_variants.py <input_vcf> <output_tsv>")
         sys.exit(1)
 
     input_vcf = sys.argv[1]
     output_tsv = sys.argv[2]
 
     process_vcf(input_vcf, output_tsv)
-    
+    logging.info("Variant annotation completed. Output saved to: %s", output_tsv)

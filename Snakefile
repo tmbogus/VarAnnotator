@@ -10,9 +10,11 @@ rule annotate_variants:
         vcf=VCF_FILE
     output:
         annotated=ANNOTATED_OUTPUT
+    log:
+        "logs/annotate_variants.log"  # Log file to capture stdout and stderr
     shell:
         """
-        python scripts/annotate_variants.py {input.vcf} {output.annotated}
+        python scripts/annotate_variants.py {input.vcf} {output.annotated} > {log} 2>&1
         """
 
 # Rule to ensure output directory exists
@@ -20,11 +22,9 @@ rule ensure_output_dir:
     output:
         directory="output"
     shell:
-        """
-        mkdir -p {output}
-        """
+        "mkdir -p {output}"
 
-# Workflow
+# Workflow entry point
 rule all:
     input:
         ANNOTATED_OUTPUT
