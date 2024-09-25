@@ -1,0 +1,42 @@
+# scripts/Snakefile
+
+import os
+from glob import glob
+
+# Find all VCF files in input/
+VCF_FILES = glob("input/*.vcf")
+
+# Extract basenames without extension
+BASE_NAMES = [os.path.splitext(os.path.basename(f))[0] for f in VCF_FILES]
+
+# Define annotated output files
+ANNOTATED_OUTPUTS = [f"output/{basename}.annotated.tsv" for basename in BASE_NAMES]
+
+# Rule to annotate each VCF
+rule annotate_variants:
+    input:
+        vcf=lambda wildcards: f"input/{wildcards.basename}.vcf"
+    output:
+        annotated=lambda wildcards: f"output/{wildcards.basename}.annotated.tsv"
+    log:
+        "logs/annotate_variants_{basename}.log"
+    shell:
+        """
+        python scripts/annotate_variants_ensembl.py {input.vcf} {output.annotated} > {log} 2>&1
+        """
+
+# Rule to concatenate all annotated outputs
+rule concatenate:
+    input:
+        ANNOTATED_OUTPUTS
+    output:
+        "output/annotated_variants.tsv"
+    shell:
+        """
+        cat {input} > {output}
+        """
+
+# Workflow entry point
+rule all:
+    input:
+        "output/annotated_variants.tsv"

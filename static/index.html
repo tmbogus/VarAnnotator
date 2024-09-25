@@ -1,0 +1,418 @@
+<!-- static/index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VarAnnotator Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for Sorting Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom Styles */
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        /* Smaller font for status indicator */
+        #status-indicator {
+            font-size: 0.8em; /* Reduced font size */
+            color: #27ae60; /* Green for success */
+        }
+        #error-message {
+            color: red;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .filters-container {
+            margin-bottom: 20px;
+        }
+        /* Remove table scrollbars */
+        .table-responsive {
+            overflow: visible;
+        }
+        /* Ensure buttons are fully visible and aligned */
+        .filter-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        /* Adjust input group */
+        .input-group .form-floating > .form-control {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        .input-group .form-select {
+            max-width: 80px;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+        /* Cursor pointer for sortable headers */
+        th.sortable {
+            cursor: pointer;
+            position: relative;
+        }
+        /* Sort indicator using ::after */
+        th.sortable::after {
+            content: "\f0dc"; /* Font Awesome sort icon */
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #ffffff80; /* Semi-transparent white */
+            pointer-events: none;
+        }
+        /* Ascending sort */
+        th.sortable.sorted-asc::after {
+            content: "\f0de"; /* Font Awesome up arrow */
+            color: #ffffff;
+        }
+        /* Descending sort */
+        th.sortable.sorted-desc::after {
+            content: "\f0dd"; /* Font Awesome down arrow */
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header with Discreet Status Indicator -->
+        <div class="row mb-2">
+            <div class="col text-center">
+                <h1>
+                    VarAnnotator Dashboard
+                </h1>
+                <div id="status-indicator">Checking pipeline status...</div>
+            </div>
+        </div>
+        
+        <!-- Error Message -->
+        <div class="row mb-3">
+            <div class="col">
+                <div id="error-message" class="text-center"></div>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="row filters-container" id="filters" style="display: none;">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-body">
+                        <form id="filter-form" class="row g-3">
+                            <!-- Frequency Filter -->
+                            <div class="col-md-5">
+                                <div class="input-group">
+                                    <div class="form-floating flex-grow-1">
+                                        <input type="number" class="form-control" id="frequency" step="0.01" min="0" max="1" placeholder="Frequency">
+                                        <label for="frequency">Frequency</label>
+                                    </div>
+                                    <select class="form-select" id="frequency_operator" aria-label="Frequency Operator">
+                                        <option value="le" selected>≤</option>
+                                        <option value="ge">≥</option>
+                                        <option value="eq">=</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Depth Filter -->
+                            <div class="col-md-5">
+                                <div class="input-group">
+                                    <div class="form-floating flex-grow-1">
+                                        <input type="number" class="form-control" id="depth" min="0" placeholder="Depth">
+                                        <label for="depth">Depth</label>
+                                    </div>
+                                    <select class="form-select" id="depth_operator" aria-label="Depth Operator">
+                                        <option value="ge" selected>≥</option>
+                                        <option value="le">≤</option>
+                                        <option value="eq">=</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Buttons -->
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="filter-buttons w-100">
+                                    <button type="button" id="apply-filters" class="btn btn-primary w-100">Apply Filters</button>
+                                    <button type="button" id="reset-filters" class="btn btn-secondary w-100">Reset Filters</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Variants Table -->
+        <div class="row" id="variants-section" style="display: none;">
+            <div class="col">
+                <div class="table-responsive">
+                    <table id="variants-table" class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="sortable" data-column="CHROM">CHROM</th>
+                                <th class="sortable" data-column="POS">POS</th>
+                                <th class="sortable" data-column="ID">ID</th>
+                                <th class="sortable" data-column="REF">REF</th>
+                                <th class="sortable" data-column="ALT">ALT</th>
+                                <th class="sortable" data-column="Gene">Gene</th>
+                                <th class="sortable" data-column="Frequency">Frequency</th>
+                                <th class="sortable" data-column="Population">Population</th>
+                                <th class="sortable" data-column="DP">DP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="variants-body">
+                            <!-- Variant rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="row" id="pagination" style="display: none;">
+            <div class="col text-center">
+                <button id="prev-page" class="btn btn-outline-primary me-2">Previous</button>
+                <span id="page-info" class="me-2">Page 1</span>
+                <button id="next-page" class="btn btn-outline-primary">Next</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Font Awesome for Sorting Icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    
+    <script>
+        let currentPage = 1;
+        const perPage = 20;
+        let totalVariants = 0;
+        let totalPages = 1;
+        let currentFilters = {};
+        let currentSort = { column: null, order: 'asc' };
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            initializeDashboard();
+            document.getElementById("apply-filters").addEventListener("click", applyFilters);
+            document.getElementById("reset-filters").addEventListener("click", resetFilters);
+            document.getElementById("prev-page").addEventListener("click", () => changePage(currentPage - 1));
+            document.getElementById("next-page").addEventListener("click", () => changePage(currentPage + 1));
+            
+            // Add event listeners to sortable headers
+            const headers = document.querySelectorAll("th.sortable");
+            headers.forEach(header => {
+                header.addEventListener("click", () => {
+                    const column = header.getAttribute("data-column");
+                    if (currentSort.column === column) {
+                        // Toggle sort order
+                        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.order = 'asc';
+                    }
+                    updateSortIndicators();
+                    fetchAndDisplayVariants();
+                });
+            });
+        });
+        
+        async function initializeDashboard() {
+            try {
+                const statusData = await fetchStatus();
+                if (statusData.status === 'running') {
+                    displayStatus(statusData.message, false);
+                } else if (statusData.status === 'failed') {
+                    displayStatus('Pipeline failed: ' + statusData.message, false);
+                } else if (statusData.status === 'idle') {
+                    displayStatus('Pipeline has not been run yet.', false);
+                } else if (statusData.status === 'completed') {
+                    displayStatus('Pipeline completed successfully.', true);
+                    fetchAndDisplayVariants();
+                } else {
+                    displayStatus('Unknown pipeline status.', false);
+                }
+            } catch (error) {
+                displayError('Error fetching pipeline status.');
+                console.error(error);
+            }
+        }
+        
+        async function fetchStatus() {
+            const response = await fetch('/status');
+            if (!response.ok) {
+                throw new Error('Failed to fetch status.');
+            }
+            return response.json();
+        }
+        
+        async function fetchVariants(page = 1, filters = {}, sort = {}) {
+            let url = `/variants?page=${page}&per_page=${perPage}`;
+            if (filters.frequency !== undefined && filters.frequency !== '') {
+                url += `&frequency=${filters.frequency}&frequency_operator=${filters.frequency_operator}`;
+            }
+            if (filters.depth !== undefined && filters.depth !== '') {
+                url += `&depth=${filters.depth}&depth_operator=${filters.depth_operator}`;
+            }
+            if (sort.column) {
+                url += `&sort_column=${encodeURIComponent(sort.column)}&sort_order=${encodeURIComponent(sort.order)}`;
+            }
+            
+            const response = await fetch(url);
+            if (response.status === 202) {
+                const data = await response.json();
+                displayStatus(data.message, false);
+                return null;
+            } else if (response.status === 503) {
+                const data = await response.json();
+                displayStatus(data.message, false);
+                return null;
+            } else if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to fetch variants.');
+            }
+            return response.json();
+        }
+        
+        function displayStatus(message, showFilters) {
+            const statusDiv = document.getElementById("status-indicator");
+            statusDiv.textContent = message;
+            if (showFilters) {
+                document.getElementById("filters").style.display = "block";
+                document.getElementById("variants-section").style.display = "block";
+                document.getElementById("pagination").style.display = "block";
+            } else {
+                document.getElementById("filters").style.display = "none";
+                document.getElementById("variants-section").style.display = "none";
+                document.getElementById("pagination").style.display = "none";
+            }
+        }
+        
+        function displayError(message) {
+            const errorDiv = document.getElementById("error-message");
+            errorDiv.textContent = message;
+        }
+        
+        function displayVariants(variants) {
+            const table = document.getElementById("variants-table");
+            const tbody = document.getElementById("variants-body");
+            tbody.innerHTML = ''; // Clear existing rows
+            
+            if (variants.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.setAttribute("colspan", "9");
+                cell.className = "text-center";
+                cell.textContent = "No variants found with the applied filters.";
+                row.appendChild(cell);
+                tbody.appendChild(row);
+                return;
+            }
+            
+            variants.forEach(variant => {
+                const row = document.createElement("tr");
+                // Define the order of keys to match the table headers
+                const keys = ["CHROM", "POS", "ID", "REF", "ALT", "Gene", "Frequency", "Population", "DP"];
+                keys.forEach(key => {
+                    const cell = document.createElement("td");
+                    cell.textContent = variant[key] !== null ? variant[key] : 'N/A';
+                    row.appendChild(cell);
+                });
+                tbody.appendChild(row);
+            });
+            
+            table.style.display = "table";
+            document.getElementById("variants-section").style.display = "block";
+            document.getElementById("pagination").style.display = "block";
+        }
+        
+        async function fetchAndDisplayVariants(page = 1) {
+            try {
+                const data = await fetchVariants(page, currentFilters, currentSort);
+                if (data) {
+                    currentPage = data.page;
+                    totalVariants = data.total_variants;
+                    totalPages = Math.ceil(totalVariants / perPage);
+                    displayVariants(data.variants);
+                    updatePagination();
+                }
+            } catch (error) {
+                displayError(error.message);
+                console.error(error);
+            }
+        }
+        
+        function updatePagination() {
+            const pageInfo = document.getElementById("page-info");
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            
+            document.getElementById("prev-page").disabled = currentPage <= 1;
+            document.getElementById("next-page").disabled = currentPage >= totalPages;
+        }
+        
+        function changePage(newPage) {
+            if (newPage < 1 || newPage > totalPages) return;
+            currentPage = newPage;
+            fetchAndDisplayVariants(currentPage);
+        }
+        
+        function applyFilters() {
+            const frequency = document.getElementById("frequency").value;
+            const frequency_operator = document.getElementById("frequency_operator").value;
+            const depth = document.getElementById("depth").value;
+            const depth_operator = document.getElementById("depth_operator").value;
+            currentFilters = {};
+            if (frequency !== '') {
+                currentFilters.frequency = frequency;
+                currentFilters.frequency_operator = frequency_operator;
+            }
+            if (depth !== '') {
+                currentFilters.depth = depth;
+                currentFilters.depth_operator = depth_operator;
+            }
+            currentPage = 1; // Reset to first page
+            fetchAndDisplayVariants();
+        }
+        
+        function resetFilters() {
+            document.getElementById("frequency").value = '';
+            document.getElementById("frequency_operator").value = 'le';
+            document.getElementById("depth").value = '';
+            document.getElementById("depth_operator").value = 'ge';
+            currentFilters = {};
+            currentSort = { column: null, order: 'asc' }; // Reset sorting
+            resetSortIndicators();
+            currentPage = 1; // Reset to first page
+            fetchAndDisplayVariants();
+        }
+        
+        function updateSortIndicators() {
+            // Remove existing sort indicators
+            const headers = document.querySelectorAll("th.sortable");
+            headers.forEach(header => {
+                header.classList.remove("sorted-asc", "sorted-desc");
+            });
+            
+            if (currentSort.column) {
+                const sortedHeader = document.querySelector(`th[data-column="${currentSort.column}"]`);
+                if (sortedHeader) {
+                    if (currentSort.order === 'asc') {
+                        sortedHeader.classList.add("sorted-asc");
+                    } else {
+                        sortedHeader.classList.add("sorted-desc");
+                    }
+                }
+            }
+        }
+        
+        function resetSortIndicators() {
+            const headers = document.querySelectorAll("th.sortable");
+            headers.forEach(header => {
+                header.classList.remove("sorted-asc", "sorted-desc");
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+VarAnnotator API Documentation
+==============================
+
+Overview
+--------
+
+The VarAnnotator API provides access to annotated genetic variants obtained from VCF files. It allows users to retrieve variants, filter them based on population frequency and depth (DP), and retrieve detailed information about specific variants.
+
+Base URL
+--------
+http://localhost:5000/
+
+Endpoints
+---------
+
+1. GET /variants
+
+   Retrieve a list of annotated variants, with optional filtering and pagination.
+
+   URL:
+   ----
+   GET /variants
+
+   Query Parameters:
+   -----------------
+   - frequency (float, optional): Maximum population frequency to filter variants. Variants with missing frequency data are excluded when this parameter is provided.
+   - depth (int, optional): Minimum depth (DP) value to filter variants. Variants with missing DP values are excluded when this parameter is provided.
+   - page (int, optional, default=1): Page number for pagination.
+   - per_page (int, optional, default=20): Number of variants per page.
+
+   Response:
+   ---------
+   - Status Code: 200 OK
+   - Content Type: application/json
+   - Body:
+
+     {
+       "page": 1,
+       "per_page": 20,
+       "total_variants": 8990,
+       "variants": [
+         {
+           "CHROM": 1,
+           "POS": 324822,
+           "ID": "rs576317820",
+           "REF": "A",
+           "ALT": "T",
+           "Gene": "RP4-669L17.10",
+           "Frequency": 0.09906,
+           "Population": "gnomADe:nfe",
+           "DP": 152
+         },
+         // ... other variants
+       ]
+     }
+
+   Example Request:
+   ----------------
+   curl "http://localhost:5000/variants?frequency=0.01&depth=10&page=1&per_page=20"
+
+2. GET /variants/<variant_id>
+
+   Retrieve detailed information about a specific variant by its ID.
+
+   URL:
+   ----
+   GET /variants/<variant_id>
+
+   URL Parameters:
+   ---------------
+   - variant_id (string): The ID of the variant (e.g., rs576317820).
+
+   Response:
+   ---------
+   - Status Code: 200 OK (if found), 404 Not Found (if not found)
+   - Content Type: application/json
+   - Body:
+
+     {
+       "CHROM": 1,
+       "POS": 324822,
+       "ID": "rs576317820",
+       "REF": "A",
+       "ALT": "T",
+       "Gene": "RP4-669L17.10",
+       "Frequency": 0.09906,
+       "Population": "gnomADe:nfe",
+       "DP": 152
+     }
+
+   Example Request:
+   ----------------
+   curl "http://localhost:5000/variants/rs576317820"
+
+Query Parameters Details
+------------------------
+
+- frequency
+  - Type: float
+  - Description: Maximum population frequency to filter variants. Only variants with frequency less than or equal to this value are returned. Variants with missing frequency data are excluded when this parameter is provided.
+
+- depth
+  - Type: integer
+  - Description: Minimum depth (DP) value to filter variants. Only variants with DP greater than or equal to this value are returned. Variants with missing DP values are excluded when this parameter is provided.
+
+- page
+  - Type: integer
+  - Description: The page number for pagination. Default is 1.
+
+- per_page
+  - Type: integer
+  - Description: The number of variants per page. Default is 20.
+
+Error Handling
+--------------
+
+- 400 Bad Request
+  - Returned when query parameters have invalid types or values.
+  - Response Body:
+    {
+      "message": "Invalid query parameter: frequency must be a float."
+    }
+
+- 404 Not Found
+  - Returned when a variant with the specified ID does not exist.
+  - Response Body:
+    {
+      "message": "Variant not found."
+    }
+
+- 500 Internal Server Error
+  - Returned when an unexpected error occurs on the server.
+  - Response Body:
+    {
+      "message": "Internal server error."
+    }
+
+Examples
+--------
+
+- Retrieve All Variants:
+  curl "http://localhost:5000/variants"
+
+- Retrieve Variants with Frequency ≤ 0.01:
+  curl "http://localhost:5000/variants?frequency=0.01"
+
+- Retrieve Variants with DP ≥ 10:
+  curl "http://localhost:5000/variants?depth=10"
+
+- Retrieve Variants with Frequency ≤ 0.01 and DP ≥ 10:
+  curl "http://localhost:5000/variants?frequency=0.01&depth=10"
+
+- Retrieve Specific Variant by ID:
+  curl "http://localhost:5000/variants/rs576317820"
+
+Notes
+-----
+
+- When both 'frequency' and 'depth' filters are applied, only variants meeting both criteria are returned.
+- Pagination parameters ('page', 'per_page') can be adjusted to navigate through large sets of variants.
+- Variants with missing frequency or depth data are included when their respective filters are not applied.
+
+Contact
+-------
+
+For any questions or issues regarding the API, please contact the project maintainer.
+
