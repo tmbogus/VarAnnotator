@@ -64,6 +64,8 @@ class EnsemblRestClient(object):
             elif isinstance(data, str):
                 data = data.encode('utf-8')
 
+        last_exception = None  # To store the last exception encountered
+
         for attempt in range(1, retries + 1):
             # Rate limiting
             self._check_rate_limit()
@@ -91,7 +93,7 @@ class EnsemblRestClient(object):
                 logging.error(f"Error content for endpoint {endpoint} on attempt {attempt}: {truncated_error_content}")
 
                 if e.code == 429:
-                    retry_after = e.headers.get('Retry-After')
+                    retry_after = e.headers.get('Retry-After') if e.headers else None
                     if retry_after:
                         try:
                             sleep_duration = float(retry_after)
@@ -103,9 +105,10 @@ class EnsemblRestClient(object):
                     sleep_duration += random.uniform(0, 1)
                     logging.warning(f"HTTP 429 Too Many Requests for endpoint {endpoint}. Retrying after {sleep_duration:.2f} seconds.")
                     time.sleep(sleep_duration)
+                    last_exception = e
                     continue  # Retry the request
                 elif e.code in [500, 502, 503, 504]:
-                    retry_after = e.headers.get('Retry-After')
+                    retry_after = e.headers.get('Retry-After') if e.headers else None
                     if retry_after:
                         try:
                             sleep_duration = float(retry_after)
@@ -117,14 +120,16 @@ class EnsemblRestClient(object):
                     sleep_duration += random.uniform(0, 1)
                     logging.warning(f"HTTP {e.code} {e.reason} for endpoint {endpoint}. Retrying after {sleep_duration:.2f} seconds.")
                     time.sleep(sleep_duration)
+                    last_exception = e
                     continue
                 elif e.code == 413:
                     # Payload Too Large
                     logging.error(f"Payload too large for endpoint {endpoint}. Consider reducing batch size.")
                     return {}
                 else:
+                    # Non-retryable error
                     logging.error(f"Non-retryable HTTP error {e.code} for endpoint {endpoint}.")
-                    return {}  # Non-retryable error
+                    raise e  # Re-raise the exception for non-retryable errors
             except URLError as e:
                 logging.error(f"URLError for endpoint {endpoint} on attempt {attempt}: {e.reason}")
                 logging.debug(traceback.format_exc())
@@ -132,10 +137,11 @@ class EnsemblRestClient(object):
                     sleep_duration = 2 ** attempt + random.uniform(0, 1)
                     logging.info(f"Retrying endpoint {endpoint} in {sleep_duration:.2f} seconds...")
                     time.sleep(sleep_duration)
+                    last_exception = e
                     continue
                 else:
                     logging.error(f"Max retries exceeded for endpoint {endpoint}.")
-                    return {}
+                    raise e  # Re-raise after max retries
             except Exception as e:
                 logging.error(f"Exception for endpoint {endpoint} on attempt {attempt}: {e}")
                 logging.debug(traceback.format_exc())
@@ -143,7 +149,16 @@ class EnsemblRestClient(object):
                     sleep_duration = 2 ** attempt + random.uniform(0, 1)
                     logging.info(f"Retrying endpoint {endpoint} in {sleep_duration:.2f} seconds...")
                     time.sleep(sleep_duration)
+                    last_exception = e
                     continue
                 else:
                     logging.error(f"Max retries exceeded for endpoint {endpoint}.")
-                    return {}
+                    raise e  # Re-raise after max retries
+
+        # After exhausting all retries, raise the last encountered exception
+        if last_exception:
+            logging.error(f"Raising the last encountered exception after {retries} attempts.")
+            raise last_exception
+
+        # Optionally, return a default value if no exception was raised (unlikely)
+        return {}

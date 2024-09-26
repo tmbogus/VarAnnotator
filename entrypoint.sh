@@ -1,21 +1,37 @@
 #!/bin/bash
 
-set -e  # Exit immediately if a command exits with a non-zero status
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-# Path to the shared status file
-STATUS_FILE="/shared/pipeline_status.json"
+# Define paths
+OUTPUT_DIR="/app/output"
+STATUS_FILE="$OUTPUT_DIR/pipeline_status.json"
+SNAKEMAKE_LOG="$OUTPUT_DIR/snakemake.log"
 
-# Ensure the shared directory exists
-mkdir -p /shared
+# Ensure the output and logs directories exist
+mkdir -p "$OUTPUT_DIR/logs"
 
-# Update status to running
-echo '{"status": "running", "message": "Pipeline is starting..."}' > $STATUS_FILE
+# Initialize the status file
+echo '{"status": "running", "message": "Pipeline is running..."}' > "$STATUS_FILE"
 
-# Run Snakemake
-snakemake -s scripts/Snakefile --cores 4
+# Function to run Snakemake and update status
+run_snakemake() {
+    echo "Starting Snakemake pipeline..." >> "$SNAKEMAKE_LOG"
+    snakemake -s scripts/Snakefile --cores 4 >> "$SNAKEMAKE_LOG" 2>&1
 
-# Update status to completed
-echo '{"status": "completed", "message": "Pipeline completed successfully."}' > $STATUS_FILE
+    if [ $? -eq 0 ]; then
+        echo '{"status": "completed", "message": "Pipeline completed successfully."}' > "$STATUS_FILE"
+    else
+        echo '{"status": "failed", "message": "Pipeline encountered an error."}' > "$STATUS_FILE"
+    fi
+}
 
-# Start the Flask app
-exec "$@"
+# Start Snakemake in the background
+run_snakemake &
+
+# Capture Snakemake's PID (optional, useful for monitoring or debugging)
+SNAKEMAKE_PID=$!
+
+# Start Flask app in the foreground
+echo "Starting Flask app..."
+exec python app.py

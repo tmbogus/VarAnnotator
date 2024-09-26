@@ -334,7 +334,7 @@
                 if (data) {
                     currentPage = data.page;
                     totalVariants = data.total_variants;
-                    totalPages = Math.ceil(totalVariants / perPage);
+                    totalPages = data.total_pages;
                     displayVariants(data.variants);
                     updatePagination();
                 }

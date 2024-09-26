@@ -34,7 +34,7 @@ ch.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(ch)
 
 # File handler for detailed logs (DEBUG and above)
-fh = logging.FileHandler('detailed_logs.log')
+fh = logging.FileHandler('logs/detailed_logs.log')
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(fh)
@@ -51,7 +51,7 @@ failed_batches_lock = threading.Lock()
 # Helper Functions
 # ================================
 
-def log_api_time(api_type, duration, output_log="api_times_log.tsv"):
+def log_api_time(api_type, duration, output_log="logs/api_times_log.tsv"):
     """Log the duration of API calls."""
     try:
         with open(output_log, 'a', newline='') as log_file:

@@ -11,8 +11,8 @@ app = Flask(__name__, static_folder='static')
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Path to the pipeline status file
-STATUS_FILE_PATH = "/shared/pipeline_status.json"
+# Path to the pipeline status file within the output directory
+STATUS_FILE_PATH = "output/pipeline_status.json"
 
 # Path to the annotated variants file
 VARIANTS_FILE_PATH = "output/annotated_variants.tsv"
@@ -20,52 +20,6 @@ VARIANTS_FILE_PATH = "output/annotated_variants.tsv"
 # Allowed columns for sorting
 ALLOWED_SORT_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "Gene", "Frequency", "Population", "DP"]
 ALLOWED_SORT_ORDERS = ["asc", "desc"]
-
-# Load the annotated variants into a DataFrame
-def load_variants(file_path):
-    if not os.path.exists(file_path):
-        return pd.DataFrame()  # Return empty DataFrame if file doesn't exist
-
-    df = pd.read_csv(file_path, sep="\t", comment="#")
-
-    # Parse the Frequency column
-    def parse_frequency(freq_str):
-        if pd.isnull(freq_str) or freq_str in ['N/A', 'NA']:
-            return pd.NA, 'N/A'
-        else:
-            try:
-                # Split by ' (' to separate frequency value and population
-                parts = freq_str.split(' (')
-                freq_value = float(parts[0].strip())
-                population = parts[1].rstrip(')') if len(parts) > 1 else 'N/A'
-                return freq_value, population
-            except Exception as e:
-                logging.error(f"Error parsing frequency '{freq_str}': {e}")
-                return pd.NA, 'N/A'
-
-    freq_parsed = df['Frequency'].apply(parse_frequency)
-    df['Frequency'], df['Population'] = zip(*freq_parsed)
-    df['Frequency'] = pd.to_numeric(df['Frequency'], errors='coerce')
-
-    # Parse the DP column
-    def parse_dp(dp_str):
-        if pd.isnull(dp_str) or dp_str in ['N/A', 'NA']:
-            return pd.NA
-        else:
-            try:
-                dp_str = dp_str.strip('[]')
-                dp_value = int(dp_str)
-                return dp_value
-            except Exception as e:
-                logging.error(f"Error parsing DP '{dp_str}': {e}")
-                return pd.NA
-
-    df['DP'] = df['DP'].apply(parse_dp)
-
-    return df
-
-# Load variants data
-variants_df = load_variants(VARIANTS_FILE_PATH)
 
 # Helper function for parameter validation
 def validate_query_param(param_value, param_name, expected_type, positive=False, min_value=None, max_value=None):
@@ -117,6 +71,48 @@ def apply_operator(series, operator, value):
         # Should not reach here if validation is correct
         raise ValueError(f"Invalid operator: {operator}")
 
+def load_variants(file_path):
+    if not os.path.exists(file_path):
+        return pd.DataFrame()  # Return empty DataFrame if file doesn't exist
+
+    df = pd.read_csv(file_path, sep="\t", comment="#")
+
+    # Parse the Frequency column
+    def parse_frequency(freq_str):
+        if pd.isnull(freq_str) or freq_str in ['N/A', 'NA']:
+            return pd.NA, 'N/A'
+        else:
+            try:
+                # Split by ' (' to separate frequency value and population
+                parts = freq_str.split(' (')
+                freq_value = float(parts[0].strip())
+                population = parts[1].rstrip(')') if len(parts) > 1 else 'N/A'
+                return freq_value, population
+            except Exception as e:
+                logging.error(f"Error parsing frequency '{freq_str}': {e}")
+                return pd.NA, 'N/A'
+
+    freq_parsed = df['Frequency'].apply(parse_frequency)
+    df['Frequency'], df['Population'] = zip(*freq_parsed)
+    df['Frequency'] = pd.to_numeric(df['Frequency'], errors='coerce')
+
+    # Parse the DP column
+    def parse_dp(dp_str):
+        if pd.isnull(dp_str) or dp_str in ['N/A', 'NA']:
+            return pd.NA
+        else:
+            try:
+                dp_str = dp_str.strip('[]')
+                dp_value = int(dp_str)
+                return dp_value
+            except Exception as e:
+                logging.error(f"Error parsing DP '{dp_str}': {e}")
+                return pd.NA
+
+    df['DP'] = df['DP'].apply(parse_dp)
+
+    return df
+
 @app.route("/variants", methods=["GET"])
 def get_variants():
     try:
@@ -159,6 +155,7 @@ def get_variants():
             return jsonify({"message": str(ve)}), 400
 
         # Check pipeline status
+        status_data = {}
         if os.path.exists(STATUS_FILE_PATH):
             with open(STATUS_FILE_PATH, 'r') as status_file:
                 status_data = json.load(status_file)
@@ -168,7 +165,14 @@ def get_variants():
                 return jsonify({"message": status_data['message']}), 500  # 500 Internal Server Error
         else:
             # If status file doesn't exist, assume idle or no data
-            if variants_df.empty:
+            pass
+
+        # Load variants data
+        variants_df = load_variants(VARIANTS_FILE_PATH)
+        if variants_df.empty:
+            if status_data.get('status') == 'completed':
+                return jsonify({"message": "Pipeline has completed but no data found."}), 503
+            else:
                 return jsonify({"message": "Pipeline has not been run yet."}), 503  # 503 Service Unavailable
 
         # Start with the full dataset
@@ -193,6 +197,7 @@ def get_variants():
 
         # Pagination
         total_variants = len(filtered_variants)
+        total_pages = (total_variants + per_page - 1) // per_page
         start = (page - 1) * per_page
         end = start + per_page
         paginated_variants = filtered_variants.iloc[start:end].replace({pd.NA: None, float('nan'): None})
@@ -202,6 +207,7 @@ def get_variants():
             "page": page,
             "per_page": per_page,
             "total_variants": total_variants,
+            "total_pages": total_pages,
             "variants": paginated_variants.to_dict(orient="records")
         }
 
@@ -214,6 +220,11 @@ def get_variants():
 @app.route("/variants/<string:variant_id>", methods=["GET"])
 def get_variant(variant_id):
     try:
+        # Load variants data
+        variants_df = load_variants(VARIANTS_FILE_PATH)
+        if variants_df.empty:
+            return jsonify({"message": "No variants data available."}), 503
+
         variant = variants_df[variants_df["ID"] == variant_id]
         if not variant.empty:
             # Replace NaN with None
@@ -236,10 +247,11 @@ def get_status():
                 status_data = json.load(status_file)
             return jsonify(status_data), 200
         else:
-            if variants_df.empty:
-                return jsonify({"status": "idle", "message": "Pipeline has not been run yet."}), 200
-            else:
+            # If status file doesn't exist
+            if os.path.exists(VARIANTS_FILE_PATH):
                 return jsonify({"status": "completed", "message": "Pipeline has completed."}), 200
+            else:
+                return jsonify({"status": "idle", "message": "Pipeline has not been run yet."}), 200
     except Exception as e:
         logging.error(f"Error retrieving pipeline status: {e}")
         return jsonify({"message": "Internal server error."}), 500

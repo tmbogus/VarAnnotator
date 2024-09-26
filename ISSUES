@@ -1,99 +1,76 @@
-## Project: Variant Annotation Pipeline
 
-### Summary of Issues and Resolutions
+# VarAnnotator - Issue Tracker
 
-#### 1. **Initial Setup and API Interaction**
+## Closed Issues
 
-**Issue**: Difficulty in retrieving variant information from Ensembl API using the correct endpoint.
-- **Cause**: Incorrect usage of the `/variation/human/{region}` endpoint, which resulted in `400 Bad Request` errors.
-- **Resolution**: Switched to the correct `/overlap/region/human/{region}` endpoint for querying variants by genomic position. This ensures we fetch all variants overlapping a specified region correctly.
+### 1. **HTTPError Handling in EnsemblRestClient**
+- Fixed how 404 and 500 errors are raised after retries.
+- Mocked `time.sleep` for faster testing of retries in unit tests.
 
-#### 2. **Mismatch of Reference and Alternate Alleles**
+### 2. **Mocking Errors in Tests**
+- Improved mocking strategy for `HTTPError` and `urlopen`.
+- Fixed issues with mocking headers in error responses.
 
-**Issue**: The original `fetch_variant_id` function assumed that the reference allele would always be in the first position in the Ensembl API response, which caused mismatches.
-- **Cause**: The Ensembl API does not always return the reference allele in the first position of the allele list.
-- **Resolution**: Updated the function to check for the presence of the reference allele anywhere in the list and to match alternate alleles accordingly. This prevents incorrect allele matching.
+### 3. **Test Suite Failures**
+- Addressed test failures related to `truncate_text`.
+- Resolved issues with handling JSON serialization in mock responses.
 
-#### 3. **Fetching the Incorrect Variant**
+### 4. **Error Not Raised After Max Retries**
+- The `EnsemblRestClient` did not correctly raise an error after max retries for HTTP 500 errors.
+- Fixed logic to raise the original error correctly after retry attempts are exhausted.
 
-**Issue**: Ensembl API returned multiple variants at the same position, but the wrong variant (e.g., an INDEL) was being selected instead of the correct SNP.
-- **Cause**: The function lacked proper filtering to ensure the right type of variant (SNP vs. INDEL) was selected.
-- **Resolution**: Introduced a check to infer the variant type (SNP or INDEL) based on the VCF record and only select variants of the matching type from the Ensembl API response.
+### 5. **Test for 500 Error in `EnsemblRestClient` Failing**
+- Mocked HTTP 500 error was not being properly raised.
+- Introduced checks to ensure correct error handling in tests by adjusting retry behavior and adding explicit exception raises.
 
-#### 4. **Handling Population Frequency Data**
+### 6. **Improper Handling of HTTP 404 in `EnsemblRestClient`**
+- Mocked HTTP 404 errors in tests were not being raised due to incorrect attributes in the mock object.
+- Corrected the mocking of the `HTTPError` class to properly set attributes like `reason` and `headers`.
 
-**Issue**: The `fetch_population_frequency` function was not retrieving population frequency data for the correct populations (e.g., `gnomAD_NFE`, `1000GENOMES:phase_3:CEU`).
-- **Cause**: Population names in Ensembl’s API responses (e.g., `gnomADe:nfe`, `gnomADg:nfe`) did not exactly match the original target populations (`gnomAD_NFE`), resulting in no matches being found.
-- **Resolution**: 
-    - Initially introduced a complex mapping between `target_ethnicities` and the Ensembl API population names (e.g., mapping `gnomAD_NFE` to `gnomADe:nfe`).
-    - Later simplified the approach by directly updating the `target_ethnicities` to the correct Ensembl population keys (e.g., `gnomADe:nfe`, `gnomADg:nfe`). This simplified population matching and improved performance.
+### 7. **Handling of Variants with Multiple Alleles in Population Frequency Retrieval**
+- The `fetch_population_frequency` function was failing to retrieve the correct frequency when multiple alleles existed.
+- Adjusted the logic to ensure correct matching between the VCF alternate allele and the allele provided by the API.
 
-#### 5. **Non-matching Variants in Population Frequency Lookup**
+### 8. **Incorrect Handling of Rate Limits**
+- The rate-limiting logic was not correctly waiting when encountering HTTP 429 errors, leading to API rate limit breaches.
+- Implemented exponential backoff with proper delays based on the `Retry-After` header.
 
-**Issue**: Some variants (e.g., `rs1557653559`) were returned as INDELs in the Ensembl API, even though they were originally annotated as SNPs in the VCF file.
-- **Cause**: Incorrect variant ID was being selected from the Ensembl response when multiple variants overlapped the same region.
-- **Resolution**: Introduced stricter allele matching to ensure that only the correct variant (with matching alleles) was selected, reducing the likelihood of selecting the wrong variant ID.
+### 9. **Batched API Calls Not Utilized in Tests**
+- The test suite did not properly mock or test the batch API functionality.
+- Updated test cases to include batched requests, ensuring efficient API utilization and response handling.
 
-#### 6. **Handling Different Genome Builds**
-
-**Issue**: The genome build in the VCF file (GRCh37) was not being explicitly handled in some of the Entrez API calls, which caused mismatches in the returned variant data.
-- **Cause**: The default build used by some API queries was GRCh38, leading to discrepancies.
-- **Resolution**: Ensured that all queries explicitly reference the correct genome build (GRCh37) to match the VCF file.
-
-#### 7. **Buffered Output During Execution**
-
-**Issue**: Output from the script was buffered, making it difficult to debug and track progress in real-time.
-- **Cause**: Python’s output was buffered by default, causing delays in log visibility.
-- **Resolution**: Used `sys.stdout.flush()` to force immediate output during script execution, ensuring that logs and data were printed in real-time.
-
-#### 8. **Incorrect Handling of Population Frequency for Certain dbSNP IDs**
-
-**Issue**: The function `fetch_population_frequency` retrieved the wrong frequency for certain dbSNP IDs, such as `rs77832891`.
-- **Cause**: The API was returning population frequency data for multiple alleles, and the wrong allele’s frequency was being selected.
-- **Resolution**: Ensured that the correct allele (based on the VCF record) was selected when fetching population frequencies. This involved improving the matching between the alternate allele in the VCF file and the allele reported in the API response.
-
-#### 9. **Population Frequency for Non-Matching Alleles**
-
-**Issue**: Some variants (e.g., `rs77832891`) had population frequency data for multiple alleles (T, G, A), and the wrong allele frequency was being reported.
-- **Cause**: The function did not correctly identify which allele in the population data corresponded to the VCF alternate allele.
-- **Resolution**: Introduced logic to select the correct population frequency based on the alternate allele from the VCF record.
-
-#### 10. **Incorrect Data Format in TSV Output**
-
-**Issue**: Data output in the TSV file for `DP` (Depth) values was formatted as a list (e.g., `[123]`), which was not desirable.
-- **Cause**: The `DP` field was treated as a list when written to the TSV.
-- **Resolution**: Updated the TSV writer to cast list values to a simple string format, removing the brackets.
+### 10. **Parallel API Requests**
+- Initial implementation did not fully parallelize the fetching of population frequency, gene annotation, and dbSNP ID.
+- Refactored to ensure all tasks are submitted in parallel, improving performance.
 
 ---
 
-## **Additional Issues and Solutions**:
+## Known Issues / Enhancements
 
-### 11. **Partial Parallelization of API Requests**
+### 1. **More Comprehensive Edge Case Testing**
+- Add additional test cases for more HTTP error statuses (e.g., 401, 403).
+- Ensure robustness across all API interaction scenarios, especially when dealing with complex variants and alternate alleles.
 
-**Issue**: Initial attempts to parallelize only focused on fetching population frequencies, leaving `dbSNP ID` and `gene annotation` fetching sequential.
-- **Cause**: The original implementation did not submit tasks for fetching `dbSNP ID` and `gene annotation` in parallel.
-- **Resolution**: Extended parallelization to include `dbSNP ID`, `gene annotation`, and `population frequency` by submitting each task to a `ThreadPoolExecutor`. This improved overall processing efficiency.
+### 2. **Performance Optimizations**
+- Explore asynchronous API calls to handle large data requests more efficiently.
+- Investigate the use of multiprocessing or async I/O to reduce overall processing time for large VCF files.
 
-### 12. **Thread Safety in `EnsemblRestClient` Rate Limiting**
+### 3. **Improved Documentation**
+- Expand the README and API documentation to include detailed usage examples, explanations of retry logic, and error-handling mechanisms.
 
-**Issue**: Thread-safety concerns arose when multiple threads attempted to increment `self.req_count` and update `self.last_req`, potentially leading to race conditions.
-- **Cause**: The rate-limiting logic was not fully protected by thread locks, allowing concurrent threads to modify shared state.
-- **Resolution**: Added a `threading.Lock()` around critical sections for rate-limiting. The lock ensures that only one thread at a time modifies `self.req_count` and `self.last_req`, making the code fully thread-safe.
+### 4. **Population Frequency Aggregation**
+- Improve how population frequencies are aggregated and presented, ensuring all relevant populations are considered and correctly annotated.
 
-### 13. **Incorrect Population Frequency Selection in Parallel Processing**
+### 5. **Database Support for Variant Storage**
+- Introduce support for storing variant annotations in a database, allowing for more scalable access, querying, and filtering of variant data.
 
-**Issue**: In highly parallel environments, the population frequency was sometimes fetched before the `dbSNP ID` was available, leading to errors or incorrect frequency data.
-- **Cause**: `fetch_population_frequency` was called before ensuring the `dbSNP ID` was fetched.
-- **Resolution**: Introduced a mechanism to fetch `population frequency` only after the `dbSNP ID` was available by submitting tasks in sequential order within the thread pool.
+### 6. **Support for detection of genome version**
+ - Implement the capability of detecting the genome version used in the VCF and use the appropriate API/Endpoints.
 
-### 14. **Handling API Rate Limits (HTTP 429 Errors)**
+### 7. **Local annotation mode**
+ - A new mode where database files are downloaded, updated and used for doing dbSNP, gene and population frequency annotation.
 
-**Issue**: API rate limits were exceeded during parallel processing, resulting in HTTP 429 errors and request failures.
-- **Cause**: High concurrency with multiple threads issuing API requests simultaneously exceeded the allowed request rate.
-- **Resolution**: Implemented a retry mechanism using the `Retry-After` header provided by the Ensembl API, allowing the system to wait and retry requests after rate limits were imposed.
+### 8. **Cloud infrastructure, platform and software services**
+ - Future implementations of the project could leverage a range of cloud services to enhance functionality and scalability. For scalable variant storage, managed databases such as Amazon RDS or Aurora, Google Cloud SQL, and Azure SQL Database might be utilized. Serverless functions like AWS Lambda, Google Cloud Functions, or Azure Functions could be employed to handle genome version detection and automate workflows efficiently. To support both local and cloud-based annotation modes, object storage solutions such as Amazon S3, Google Cloud Storage, or Azure Blob Storage would provide reliable data storage and access. Data warehousing and analytics tools like Amazon Redshift, BigQuery, or Azure Synapse Analytics could facilitate efficient querying and comprehensive data analysis. Additionally, container orchestration platforms such as Amazon EKS, Google Kubernetes Engine (GKE), or Azure Kubernetes Service (AKS) might be used to scale annotation processing seamlessly. API management could be addressed through services like Amazon API Gateway, Google Cloud Endpoints, or Azure API Management, while workflow orchestration could be streamlined using AWS Step Functions, Google Cloud Composer, or Azure Logic Apps. Lastly, adopting Infrastructure as Code (IaC) tools like Terraform would ensure consistent and automated deployment across the chosen cloud environments. This integration of diverse cloud services would provide a robust, scalable, and efficient foundation for the project's future enhancements.
 
-### 15. **Multiple VCF Record Processing Not Fully Parallelized**
-
-**Issue**: The initial design only parallelized parts of the workflow for each VCF record, reducing the overall parallelization benefits.
-- **Cause**: Only population frequency fetching was parallelized; other tasks like `dbSNP ID` and `gene annotation` were still processed sequentially.
-- **Resolution**: Full parallelization was achieved by submitting tasks for all API calls (`dbSNP ID`, `gene annotation`, and `population frequency`) to a `ThreadPoolExecutor`, ensuring each VCF record was processed independently and concurrently.
+---

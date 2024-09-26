@@ -12,18 +12,13 @@ BASE_NAMES = [os.path.splitext(os.path.basename(f))[0] for f in VCF_FILES]
 # Define annotated output files
 ANNOTATED_OUTPUTS = [f"output/{basename}.annotated.tsv" for basename in BASE_NAMES]
 
-# Rule to annotate each VCF
-rule annotate_variants:
+# Ensure the logs directory exists
+os.makedirs("output/logs", exist_ok=True)
+
+# Workflow entry point
+rule all:
     input:
-        vcf=lambda wildcards: f"input/{wildcards.basename}.vcf"
-    output:
-        annotated=lambda wildcards: f"output/{wildcards.basename}.annotated.tsv"
-    log:
-        "logs/annotate_variants_{basename}.log"
-    shell:
-        """
-        python scripts/annotate_variants_ensembl.py {input.vcf} {output.annotated} > {log} 2>&1
-        """
+        "output/annotated_variants.tsv"
 
 # Rule to concatenate all annotated outputs
 rule concatenate:
@@ -36,7 +31,16 @@ rule concatenate:
         cat {input} > {output}
         """
 
-# Workflow entry point
-rule all:
+# Rule to annotate each VCF
+rule annotate_variants:
     input:
-        "output/annotated_variants.tsv"
+        vcf=lambda wildcards: f"input/{wildcards.basename}.vcf"
+    output:
+        annotated="output/{basename}.annotated.tsv"
+    log:
+        "output/logs/annotate_variants_{basename}.log"
+    shell:
+        """
+        python scripts/annotate_variants_ensembl.py {input.vcf} {output.annotated} > {log} 2>&1
+        """
+
