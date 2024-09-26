@@ -67,10 +67,13 @@
 ### 6. **Support for detection of genome version**
  - Implement the capability of detecting the genome version used in the VCF and use the appropriate API/Endpoints.
 
-### 7. **Local annotation mode**
+### 7. **Implement a Process Manager**
+ - Replace background process management with Supervisord for better handling of multiple processes.
+
+### 8. **Local annotation mode**
  - A new mode where database files are downloaded, updated and used for doing dbSNP, gene and population frequency annotation.
 
-### 8. **Cloud infrastructure, platform and software services**
+### 9. **Cloud infrastructure, platform and software services**
  - Future implementations of the project could leverage a range of cloud services to enhance functionality and scalability. For scalable variant storage, managed databases such as Amazon RDS or Aurora, Google Cloud SQL, and Azure SQL Database might be utilized. Serverless functions like AWS Lambda, Google Cloud Functions, or Azure Functions could be employed to handle genome version detection and automate workflows efficiently. To support both local and cloud-based annotation modes, object storage solutions such as Amazon S3, Google Cloud Storage, or Azure Blob Storage would provide reliable data storage and access. Data warehousing and analytics tools like Amazon Redshift, BigQuery, or Azure Synapse Analytics could facilitate efficient querying and comprehensive data analysis. Additionally, container orchestration platforms such as Amazon EKS, Google Kubernetes Engine (GKE), or Azure Kubernetes Service (AKS) might be used to scale annotation processing seamlessly. API management could be addressed through services like Amazon API Gateway, Google Cloud Endpoints, or Azure API Management, while workflow orchestration could be streamlined using AWS Step Functions, Google Cloud Composer, or Azure Logic Apps. Lastly, adopting Infrastructure as Code (IaC) tools like Terraform would ensure consistent and automated deployment across the chosen cloud environments. This integration of diverse cloud services would provide a robust, scalable, and efficient foundation for the project's future enhancements.
 
 ---

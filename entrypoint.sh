@@ -32,6 +32,6 @@ run_snakemake &
 # Capture Snakemake's PID (optional, useful for monitoring or debugging)
 SNAKEMAKE_PID=$!
 
-# Start Flask app in the foreground
-echo "Starting Flask app..."
-exec python app.py
+# Start Flask app with Gunicorn in the foreground
+echo "Starting Flask app with Gunicorn..."
+exec gunicorn -w 4 -b 0.0.0.0:5000 app:app

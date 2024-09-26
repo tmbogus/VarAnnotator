@@ -1,5 +1,5 @@
 # Use an official Python base image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -47,6 +47,3 @@ VOLUME /app/output
 
 # Define the entrypoint with absolute path for reliability
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-# Remove CMD as entrypoint.sh handles running Flask
-# CMD ["python", "app.py"]  # This line is removed

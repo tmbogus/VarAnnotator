@@ -32,7 +32,7 @@ VarAnnotator is a bioinformatics pipeline designed to efficiently annotate genet
 ## Installation
 
 ### Prerequisites
-- **Python 3.8+**
+- **Python 3.11**
 - **Docker** (for containerized execution)
 - **Git**
 
@@ -61,13 +61,51 @@ VarAnnotator is a bioinformatics pipeline designed to efficiently annotate genet
 
 ### Running the Variant Annotation Pipeline
 
-To annotate variants from a VCF file:
+To annotate variants from a VCF file, use the following command:
 
 ```bash
 python scripts/annotate_variants_ensembl.py --input_vcf ./input/NIST.vcf --output_tsv ./output/NIST.annotated.tsv
 ```
 
-This will generate a TSV file containing the annotations.
+This command will generate a TSV file containing the annotations.
+
+#### Available Options
+
+The `annotate_variants_ensembl.py` script supports several optional arguments to customize the annotation process:
+
+- **`--batch_size`**  
+  *Description:* Number of variants per API request.  
+  *Default:* `25`  
+  *Example:* `--batch_size 50`
+
+- **`--max_workers`**  
+  *Description:* Number of worker threads for parallel processing.  
+  *Default:* `15`  
+  *Example:* `--max_workers 20`
+
+- **`--reqs_per_sec`**  
+  *Description:* API requests per second to adhere to rate limits.  
+  *Default:* `15`  
+  *Example:* `--reqs_per_sec 10`
+
+- **`--target_populations`**  
+  *Description:* Specify target populations for frequency data.  
+  *Default:* `["gnomADe:NFE", "gnomADg:NFE", "1000GENOMES:phase_3:CEU"]`  
+  *Example:* `--target_populations gnomADe:AFR 1000GENOMES:phase_3:CHB`
+
+#### Example with Additional Arguments
+
+```bash
+python scripts/annotate_variants_ensembl.py \
+  --input_vcf ./input/NIST.vcf \
+  --output_tsv ./output/NIST.annotated.tsv \
+  --batch_size 50 \
+  --max_workers 20 \
+  --reqs_per_sec 10 \
+  --target_populations gnomADe:AFR 1000GENOMES:phase_3:CHB
+```
+
+This example customizes the annotation process by adjusting the batch size, number of worker threads, request rate, and specifying different target populations for frequency data.
 
 ### Starting the Web Interface
 
